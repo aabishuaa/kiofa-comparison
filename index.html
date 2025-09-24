@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KIOFA Results Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #ffffff;
+            font-family: 'Arial', sans-serif;
+            color: #333333;
+            min-height: 100vh;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #6366f1;
+            color: #ffffff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+        }
+
+        .back-button:hover {
+            background: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 40px;
+            margin-top: 40px;
+        }
+
+        .main-title {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #1f2937;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .chart-wrapper {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 16px;
+            border: 2px solid #e5e7eb;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #1f2937;
+            text-align: center;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
+
+        .runtime-chart {
+            grid-column: span 2;
+        }
+
+        .download-section {
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .download-btn {
+            background: #10b981;
+            color: #ffffff;
+            border: 2px solid #10b981;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .download-btn:hover {
+            background: #059669;
+            border-color: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .legend-note {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #6b7280;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="back-button" onclick="goBack()">← Back to Main</button>
+
+    <div class="dashboard-header">
+        <div class="main-title">KIOFA Results Dashboard</div>
+        <div class="subtitle">Comprehensive Performance Analysis</div>
+    </div>
+
+    <div class="charts-container">
+        <!-- Accuracy at Thresholds Chart -->
+        <div class="chart-wrapper">
+            <div class="chart-title">Tracking Accuracy at Thresholds</div>
+            <div class="chart-container">
+                <canvas id="accuracyChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Mean Endpoint Error Chart -->
+        <div class="chart-wrapper">
+            <div class="chart-title">Mean Endpoint Error</div>
+            <div class="chart-container">
+                <canvas id="errorChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Runtime Performance Chart -->
+        <div class="chart-wrapper runtime-chart">
+            <div class="chart-title">Runtime Performance Comparison</div>
+            <div class="chart-container">
+                <canvas id="runtimeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="download-section">
+        <button class="download-btn" onclick="downloadChart('accuracy')">Download Accuracy Chart</button>
+        <button class="download-btn" onclick="downloadChart('error')">Download Error Chart</button>
+        <button class="download-btn" onclick="downloadChart('runtime')">Download Runtime Chart</button>
+        <button class="download-btn" onclick="downloadAllCharts()">Download All Charts</button>
+    </div>
+
+    <div class="legend-note">
+        ■ Dense Methods (Blue/Teal) ■ Sparse Methods (Pink/Purple) ■ KIOFA Methods (Green/Orange)
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script>
+        let charts = {};
+
+        document.addEventListener('DOMContentLoaded', function () {
+            createAccuracyChart();
+            createErrorChart();
+            createRuntimeChart();
+        });
+
+        function goBack() {
+            // You can modify this to go to your specific main page
+            window.location.href = '';
+        }
+
+        function getMethodColor(method) {
+            // Dense methods - Blue/Teal pastels
+            if (method === 'MFT') return '#7dd3fc'; // Light blue
+            if (method === 'RAFT') return '#5eead4'; // Light teal
+
+            // Sparse methods - Pink/Purple pastels  
+            if (method === 'CoTracker3') return '#f9a8d4'; // Light pink
+            if (method === 'SuperPointGlue') return '#d8b4fe'; // Light purple
+
+            // KIOFA methods - Green/Orange pastels
+            if (method === 'Patch Tracker') return '#86efac'; // Light green
+            if (method === 'Scaled Tracker') return '#fed7aa'; // Light orange
+
+            return '#cbd5e1';
+        }
+
+        function getMethodBorderColor(method) {
+            // Dense methods - Darker blue/teal
+            if (method === 'MFT') return '#0284c7'; // Blue
+            if (method === 'RAFT') return '#0d9488'; // Teal
+
+            // Sparse methods - Darker pink/purple
+            if (method === 'CoTracker3') return '#ec4899'; // Pink
+            if (method === 'SuperPointGlue') return '#a855f7'; // Purple
+
+            // KIOFA methods - Darker green/orange
+            if (method === 'Patch Tracker') return '#16a34a'; // Green
+            if (method === 'Scaled Tracker') return '#ea580c'; // Orange
+
+            return '#64748b';
+        }
+
+        function createAccuracyChart() {
+            const data = {
+                labels: ['4px', '8px', '16px', '32px', '64px'],
+                datasets: [
+                    {
+                        label: 'MFT (Dense)',
+                        data: [42.35, 69.36, 86.70, 93.36, 96.39],
+                        borderColor: getMethodBorderColor('MFT'),
+                        backgroundColor: getMethodColor('MFT'),
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'RAFT (Dense)',
+                        data: [7.26, 19.35, 39.93, 64.93, 80.24],
+                        borderColor: getMethodBorderColor('RAFT'),
+                        backgroundColor: getMethodColor('RAFT'),
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        tension: 0.1,
+                        borderDash: [5, 5]
+                    },
+                    {
+                        label: 'CoTracker3 (Sparse)',
+                        data: [3.02, 8.67, 20.98, 50.61, 72.78],
+                        borderColor: getMethodBorderColor('CoTracker3'),
+                        backgroundColor: getMethodColor('CoTracker3'),
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'SuperPointGlue (Sparse)',
+                        data: [4.83, 9.87, 22.17, 45.36, 62.29],
+                        borderColor: getMethodBorderColor('SuperPointGlue'),
+                        backgroundColor: getMethodColor('SuperPointGlue'),
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        tension: 0.1,
+                        borderDash: [10, 5]
+                    },
+                    {
+                        label: 'Patch Tracker (KIOFA)',
+                        data: [23.79, 43.54, 66.50, 78.83, 85.48],
+                        borderColor: getMethodBorderColor('Patch Tracker'),
+                        backgroundColor: getMethodColor('Patch Tracker'),
+                        borderWidth: 4,
+                        pointRadius: 8,
+                        tension: 0.1,
+                        pointStyle: 'triangle'
+                    },
+                    {
+                        label: 'Scaled Tracker (KIOFA)',
+                        data: [34.67, 56.65, 78.42, 91.53, 95.76],
+                        borderColor: getMethodBorderColor('Scaled Tracker'),
+                        backgroundColor: getMethodColor('Scaled Tracker'),
+                        borderWidth: 4,
+                        pointRadius: 8,
+                        tension: 0.1,
+                        pointStyle: 'rect'
+                    }
+                ]
+            };
+
+            const config = {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#374151',
+                                font: { size: 12, weight: 'bold' },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Accuracy (%)',
+                                color: '#374151',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                font: { size: 12 },
+                                callback: function (value) { return value + '%'; }
+                            },
+                            grid: { color: '#e5e7eb' }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Distance Threshold',
+                                color: '#374151',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                font: { size: 12 }
+                            },
+                            grid: { color: '#e5e7eb' }
+                        }
+                    }
+                }
+            };
+
+            charts.accuracy = new Chart(document.getElementById('accuracyChart'), config);
+        }
+
+        function createErrorChart() {
+            // Sort by MEE (lowest to highest - best to worst)
+            const methodData = [
+                { method: 'MFT', error: 15.26, type: 'Dense' },
+                { method: 'Scaled Tracker', error: 16.07, type: 'KIOFA' },
+                { method: 'Patch Tracker', error: 36.62, type: 'KIOFA' },
+                { method: 'RAFT', error: 46.07, type: 'Dense' },
+                { method: 'CoTracker3', error: 64.26, type: 'Sparse' },
+                { method: 'SuperPointGlue', error: 78.92, type: 'Sparse' }
+            ];
+
+            const data = {
+                labels: methodData.map(item => item.method),
+                datasets: [{
+                    label: 'Mean Endpoint Error (px)',
+                    data: methodData.map(item => item.error),
+                    backgroundColor: methodData.map(item => getMethodColor(item.method)),
+                    borderColor: methodData.map(item => getMethodBorderColor(item.method)),
+                    borderWidth: 2
+                }]
+            };
+
+            const config = {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Mean Endpoint Error (px) → LOWER IS BETTER',
+                                color: '#374151',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                font: { size: 12 }
+                            },
+                            grid: { color: '#e5e7eb' }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Methods (Ordered: Best → Worst)',
+                                color: '#374151',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#374151',
+                                font: { size: 11, weight: 'bold' },
+                                maxRotation: 45
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                },
+                plugins: [{
+                    afterDatasetsDraw: function (chart) {
+                        const ctx = chart.ctx;
+                        chart.data.datasets.forEach((dataset, i) => {
+                            const meta = chart.getDatasetMeta(i);
+                            meta.data.forEach((bar, index) => {
+                                const data = dataset.data[index];
+                                ctx.fillStyle = '#1f2937';
+                                ctx.font = 'bold 11px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillText(data + 'px', bar.x, bar.y - 5);
+                            });
+                        });
+                    }
+                }]
+            };
+
+            charts.error = new Chart(document.getElementById('errorChart'), config);
+        }
+
+        function createRuntimeChart() {
+            // Sort by runtime (fastest to slowest)
+            const timeData = [
+                { method: 'Patch Tracker', time: '10m 55s', minutes: 10 + 55 / 60, type: 'KIOFA' },
+                { method: 'SuperPointGlue', time: '12m 55s', minutes: 12 + 55 / 60, type: 'Sparse' },
+                { method: 'CoTracker3', time: '12m 57s', minutes: 12 + 57 / 60, type: 'Sparse' },
+                { method: 'RAFT', time: '15m 5s', minutes: 15 + 5 / 60, type: 'Dense' },
+                { method: 'Scaled Tracker', time: '27m 104s', minutes: 27 + 104 / 60, type: 'KIOFA' },
+                { method: 'MFT', time: '59m 55s', minutes: 59 + 55 / 60, type: 'Dense' }
+            ];
+
+            const data = {
+                labels: timeData.map(item => item.method),
+                datasets: [{
+                    label: 'Runtime (minutes)',
+                    data: timeData.map(item => item.minutes),
+                    backgroundColor: timeData.map(item => getMethodColor(item.method)),
+                    borderColor: timeData.map(item => getMethodBorderColor(item.method)),
+                    borderWidth: 2
+                }]
+            };
+
+            const config = {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Runtime (minutes) → LOWER IS BETTER',
+                                color: '#374151',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                font: { size: 12 },
+                                callback: function (value) { return value.toFixed(1) + 'm'; }
+                            },
+                            grid: { color: '#e5e7eb' }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Methods (Ordered: Fastest → Slowest)',
+                                color: '#374151',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#374151',
+                                font: { size: 11, weight: 'bold' },
+                                maxRotation: 45
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                },
+                plugins: [{
+                    afterDatasetsDraw: function (chart) {
+                        const ctx = chart.ctx;
+                        chart.data.datasets.forEach((dataset, i) => {
+                            const meta = chart.getDatasetMeta(i);
+                            meta.data.forEach((bar, index) => {
+                                const originalTime = timeData[index].time;
+                                ctx.fillStyle = '#1f2937';
+                                ctx.font = 'bold 10px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillText(originalTime, bar.x, bar.y - 5);
+                            });
+                        });
+                    }
+                }]
+            };
+
+            charts.runtime = new Chart(document.getElementById('runtimeChart'), config);
+        }
+
+        function downloadChart(chartType) {
+            const chart = charts[chartType];
+            if (!chart) return;
+
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            tempCanvas.width = chart.canvas.width;
+            tempCanvas.height = chart.canvas.height;
+
+            tempCtx.fillStyle = '#ffffff';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            tempCtx.drawImage(chart.canvas, 0, 0);
+
+            const link = document.createElement('a');
+            link.download = `kiofa_${chartType}_chart.png`;
+            link.href = tempCanvas.toDataURL('image/png');
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function downloadAllCharts() {
+            setTimeout(() => downloadChart('accuracy'), 100);
+            setTimeout(() => downloadChart('error'), 500);
+            setTimeout(() => downloadChart('runtime'), 900);
+        }
+    </script>
+</body>
+
+</html>
