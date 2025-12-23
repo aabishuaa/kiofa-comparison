@@ -70,6 +70,30 @@
             border-radius: 16px;
             border: 2px solid #e5e7eb;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .chart-wrapper:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+            border-color: #6366f1;
+        }
+
+        .chart-wrapper::after {
+            content: '🔍 Click to expand';
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 12px;
+            color: #6b7280;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .chart-wrapper:hover::after {
+            opacity: 1;
         }
 
         .chart-title {
@@ -123,6 +147,123 @@
             color: #6b7280;
             font-weight: 600;
         }
+
+        /* Fullscreen Modal Styles */
+        .chart-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .chart-modal.active {
+            display: flex;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 40px;
+            width: 90vw;
+            height: 85vh;
+            max-width: 1600px;
+            position: relative;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            transform: scale(0.8);
+            animation: zoomIn 0.4s ease forwards;
+        }
+
+        @keyframes zoomIn {
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #ef4444;
+            color: #ffffff;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .modal-close:hover {
+            background: #dc2626;
+            transform: rotate(90deg) scale(1.1);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
+        }
+
+        .modal-title {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #1f2937;
+            text-align: center;
+        }
+
+        .modal-chart-container {
+            position: relative;
+            height: calc(100% - 80px);
+            width: 100%;
+        }
+
+        .modal-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #6b7280;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .modal-content {
+                width: 95vw;
+                height: 90vh;
+                padding: 20px;
+            }
+
+            .modal-title {
+                font-size: 24px;
+                margin-bottom: 20px;
+            }
+
+            .modal-close {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+        }
     </style>
 </head>
 
@@ -136,7 +277,7 @@
 
     <div class="charts-container">
         <!-- Accuracy at Thresholds Chart -->
-        <div class="chart-wrapper">
+        <div class="chart-wrapper" onclick="expandChart('accuracy', 'Tracking Accuracy at Thresholds')">
             <div class="chart-title">Tracking Accuracy at Thresholds</div>
             <div class="chart-container">
                 <canvas id="accuracyChart"></canvas>
@@ -144,7 +285,7 @@
         </div>
 
         <!-- Mean Endpoint Error Chart -->
-        <div class="chart-wrapper">
+        <div class="chart-wrapper" onclick="expandChart('error', 'Mean Endpoint Error')">
             <div class="chart-title">Mean Endpoint Error</div>
             <div class="chart-container">
                 <canvas id="errorChart"></canvas>
@@ -152,7 +293,7 @@
         </div>
 
         <!-- Runtime Performance Chart -->
-        <div class="chart-wrapper runtime-chart">
+        <div class="chart-wrapper runtime-chart" onclick="expandChart('runtime', 'Runtime Performance Comparison')">
             <div class="chart-title">Runtime Performance Comparison</div>
             <div class="chart-container">
                 <canvas id="runtimeChart"></canvas>
@@ -171,14 +312,34 @@
         ■ Dense Methods (Blue/Teal) ■ Sparse Methods (Pink/Purple) ■ KIOFA Methods (Green/Orange)
     </div>
 
+    <!-- Fullscreen Chart Modal -->
+    <div id="chartModal" class="chart-modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <div class="modal-title" id="modalTitle"></div>
+            <div class="modal-chart-container">
+                <canvas id="modalChart"></canvas>
+            </div>
+            <div class="modal-hint">Press ESC to close or click outside</div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     <script>
         let charts = {};
+        let modalChart = null;
 
         document.addEventListener('DOMContentLoaded', function () {
             createAccuracyChart();
             createErrorChart();
             createRuntimeChart();
+        });
+
+        // ESC key to close modal
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
         });
 
         function goBack() {
@@ -550,6 +711,359 @@
             setTimeout(() => downloadChart('accuracy'), 100);
             setTimeout(() => downloadChart('error'), 500);
             setTimeout(() => downloadChart('runtime'), 900);
+        }
+
+        // Fullscreen Modal Functions
+        function expandChart(chartType, title) {
+            const modal = document.getElementById('chartModal');
+            const modalTitle = document.getElementById('modalTitle');
+
+            // Set title
+            modalTitle.textContent = title;
+
+            // Show modal
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            // Destroy existing modal chart if any
+            if (modalChart) {
+                modalChart.destroy();
+            }
+
+            // Recreate chart in modal based on type
+            setTimeout(() => {
+                if (chartType === 'accuracy') {
+                    createModalAccuracyChart();
+                } else if (chartType === 'error') {
+                    createModalErrorChart();
+                } else if (chartType === 'runtime') {
+                    createModalRuntimeChart();
+                }
+            }, 100);
+        }
+
+        function closeModal(event) {
+            const modal = document.getElementById('chartModal');
+            modal.classList.remove('active');
+            document.body.style.overflow = 'auto';
+
+            // Destroy modal chart
+            if (modalChart) {
+                modalChart.destroy();
+                modalChart = null;
+            }
+        }
+
+        function createModalAccuracyChart() {
+            const data = {
+                labels: ['4px', '8px', '16px', '32px', '64px'],
+                datasets: [
+                    {
+                        label: 'MFT (Dense)',
+                        data: [42.35, 69.36, 86.70, 93.36, 96.39],
+                        borderColor: getMethodBorderColor('MFT'),
+                        backgroundColor: getMethodColor('MFT'),
+                        borderWidth: 4,
+                        pointRadius: 8,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'RAFT (Dense)',
+                        data: [7.26, 19.35, 39.93, 64.93, 80.24],
+                        borderColor: getMethodBorderColor('RAFT'),
+                        backgroundColor: getMethodColor('RAFT'),
+                        borderWidth: 4,
+                        pointRadius: 8,
+                        tension: 0.1,
+                        borderDash: [5, 5]
+                    },
+                    {
+                        label: 'CoTracker3 (Sparse)',
+                        data: [3.02, 8.67, 20.98, 50.61, 72.78],
+                        borderColor: getMethodBorderColor('CoTracker3'),
+                        backgroundColor: getMethodColor('CoTracker3'),
+                        borderWidth: 4,
+                        pointRadius: 8,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'SuperPointGlue (Sparse)',
+                        data: [4.83, 9.87, 22.17, 45.36, 62.29],
+                        borderColor: getMethodBorderColor('SuperPointGlue'),
+                        backgroundColor: getMethodColor('SuperPointGlue'),
+                        borderWidth: 4,
+                        pointRadius: 8,
+                        tension: 0.1,
+                        borderDash: [10, 5]
+                    },
+                    {
+                        label: 'Patch Tracker (KIOFA)',
+                        data: [23.79, 43.54, 66.50, 78.83, 85.48],
+                        borderColor: getMethodBorderColor('Patch Tracker'),
+                        backgroundColor: getMethodColor('Patch Tracker'),
+                        borderWidth: 5,
+                        pointRadius: 10,
+                        tension: 0.1,
+                        pointStyle: 'triangle'
+                    },
+                    {
+                        label: 'Scaled Tracker (KIOFA)',
+                        data: [34.67, 56.65, 78.42, 91.53, 95.76],
+                        borderColor: getMethodBorderColor('Scaled Tracker'),
+                        backgroundColor: getMethodColor('Scaled Tracker'),
+                        borderWidth: 5,
+                        pointRadius: 10,
+                        tension: 0.1,
+                        pointStyle: 'rect'
+                    }
+                ]
+            };
+
+            const config = {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#374151',
+                                font: { size: 16, weight: 'bold' },
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            titleFont: { size: 16 },
+                            bodyFont: { size: 14 },
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Accuracy (%)',
+                                color: '#374151',
+                                font: { size: 18, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                font: { size: 14 },
+                                callback: function (value) { return value + '%'; }
+                            },
+                            grid: { color: '#e5e7eb' }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Distance Threshold',
+                                color: '#374151',
+                                font: { size: 18, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                font: { size: 14 }
+                            },
+                            grid: { color: '#e5e7eb' }
+                        }
+                    }
+                }
+            };
+
+            modalChart = new Chart(document.getElementById('modalChart'), config);
+        }
+
+        function createModalErrorChart() {
+            const methodData = [
+                { method: 'MFT', error: 15.26, type: 'Dense' },
+                { method: 'Scaled Tracker', error: 16.07, type: 'KIOFA' },
+                { method: 'Patch Tracker', error: 36.62, type: 'KIOFA' },
+                { method: 'RAFT', error: 46.07, type: 'Dense' },
+                { method: 'CoTracker3', error: 64.26, type: 'Sparse' },
+                { method: 'SuperPointGlue', error: 78.92, type: 'Sparse' }
+            ];
+
+            const data = {
+                labels: methodData.map(item => item.method),
+                datasets: [{
+                    label: 'Mean Endpoint Error (px)',
+                    data: methodData.map(item => item.error),
+                    backgroundColor: methodData.map(item => getMethodColor(item.method)),
+                    borderColor: methodData.map(item => getMethodBorderColor(item.method)),
+                    borderWidth: 3
+                }]
+            };
+
+            const config = {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            titleFont: { size: 16 },
+                            bodyFont: { size: 14 },
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Mean Endpoint Error (px) → LOWER IS BETTER',
+                                color: '#374151',
+                                font: { size: 18, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                font: { size: 14 }
+                            },
+                            grid: { color: '#e5e7eb' }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Methods (Ordered: Best → Worst)',
+                                color: '#374151',
+                                font: { size: 16, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#374151',
+                                font: { size: 13, weight: 'bold' },
+                                maxRotation: 45
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                },
+                plugins: [{
+                    afterDatasetsDraw: function (chart) {
+                        const ctx = chart.ctx;
+                        chart.data.datasets.forEach((dataset, i) => {
+                            const meta = chart.getDatasetMeta(i);
+                            meta.data.forEach((bar, index) => {
+                                const data = dataset.data[index];
+                                ctx.fillStyle = '#1f2937';
+                                ctx.font = 'bold 14px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillText(data + 'px', bar.x, bar.y - 5);
+                            });
+                        });
+                    }
+                }]
+            };
+
+            modalChart = new Chart(document.getElementById('modalChart'), config);
+        }
+
+        function createModalRuntimeChart() {
+            const timeData = [
+                { method: 'Patch Tracker', time: '10m 55s', minutes: 10 + 55 / 60, type: 'KIOFA' },
+                { method: 'SuperPointGlue', time: '12m 55s', minutes: 12 + 55 / 60, type: 'Sparse' },
+                { method: 'CoTracker3', time: '12m 57s', minutes: 12 + 57 / 60, type: 'Sparse' },
+                { method: 'RAFT', time: '15m 5s', minutes: 15 + 5 / 60, type: 'Dense' },
+                { method: 'Scaled Tracker', time: '27m 104s', minutes: 27 + 104 / 60, type: 'KIOFA' },
+                { method: 'MFT', time: '59m 55s', minutes: 59 + 55 / 60, type: 'Dense' }
+            ];
+
+            const data = {
+                labels: timeData.map(item => item.method),
+                datasets: [{
+                    label: 'Runtime (minutes)',
+                    data: timeData.map(item => item.minutes),
+                    backgroundColor: timeData.map(item => getMethodColor(item.method)),
+                    borderColor: timeData.map(item => getMethodBorderColor(item.method)),
+                    borderWidth: 3
+                }]
+            };
+
+            const config = {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            titleFont: { size: 16 },
+                            bodyFont: { size: 14 },
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Runtime (minutes) → LOWER IS BETTER',
+                                color: '#374151',
+                                font: { size: 18, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                font: { size: 14 },
+                                callback: function (value) { return value.toFixed(1) + 'm'; }
+                            },
+                            grid: { color: '#e5e7eb' }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Methods (Ordered: Fastest → Slowest)',
+                                color: '#374151',
+                                font: { size: 16, weight: 'bold' }
+                            },
+                            ticks: {
+                                color: '#374151',
+                                font: { size: 13, weight: 'bold' },
+                                maxRotation: 45
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                },
+                plugins: [{
+                    afterDatasetsDraw: function (chart) {
+                        const ctx = chart.ctx;
+                        chart.data.datasets.forEach((dataset, i) => {
+                            const meta = chart.getDatasetMeta(i);
+                            meta.data.forEach((bar, index) => {
+                                const originalTime = timeData[index].time;
+                                ctx.fillStyle = '#1f2937';
+                                ctx.font = 'bold 13px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillText(originalTime, bar.x, bar.y - 5);
+                            });
+                        });
+                    }
+                }]
+            };
+
+            modalChart = new Chart(document.getElementById('modalChart'), config);
         }
     </script>
 </body>
